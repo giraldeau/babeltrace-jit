@@ -1,0 +1,53 @@
+#!/usr/bin/python3.5
+
+
+import sys
+sys.path.append("/usr/local/lib/python3/dist-packages")
+
+import babeltrace.writer as btw
+import os
+
+trace_path = "trace"
+if not os.path.exists(trace_path):
+    os.mkdir(trace_path)
+
+writer = btw.Writer(trace_path)
+
+clock = btw.Clock("my_monotonic_clock")
+writer.add_clock(clock)
+
+stream_class = btw.StreamClass("my_stream_class")
+stream_class.clock = clock
+
+int32_type = btw.IntegerFieldDeclaration(32)
+int32_type.signed = True
+
+event_class_foo = btw.EventClass("event_foo")
+event_class_foo.add_field(int32_type, "foo")
+
+event_class_bar = btw.EventClass("event_bar")
+event_class_bar.add_field(int32_type, "bar")
+
+stream_class.add_event_class(event_class_foo)
+stream_class.add_event_class(event_class_bar)
+stream = writer.create_stream(stream_class)
+
+count = 0
+
+for i in range(10):
+    event = btw.Event(event_class_foo)
+    clock.time = i + 0x1000
+    field = event.payload("foo")
+    field.value = count
+    stream.append_event(event)
+    count += 1
+
+    event = btw.Event(event_class_bar)
+    clock.time = i + 0x1000
+    field = event.payload("bar")
+    field.value = count
+    stream.append_event(event)
+    count += 1
+
+stream.flush()
+
