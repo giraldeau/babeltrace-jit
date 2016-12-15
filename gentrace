@@ -36,16 +36,16 @@ count = 0
 
 for i in range(10):
     event = btw.Event(event_class_foo)
-    clock.time = i + 0x1000
+    clock.time = 0x1000 + count
     field = event.payload("foo")
-    field.value = count
+    field.value = 0xbeef
     stream.append_event(event)
     count += 1
 
     event = btw.Event(event_class_bar)
-    clock.time = i + 0x1000
+    clock.time = 0x1000 + count
     field = event.payload("bar")
-    field.value = count
+    field.value = 0xcafe
     stream.append_event(event)
     count += 1
 

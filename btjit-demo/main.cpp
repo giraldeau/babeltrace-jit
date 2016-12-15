@@ -8,12 +8,12 @@ struct packet_header {
     quint32 magic;
     const char uuid[16];
     quint32 stream_id;
-} pa(8);
+} pa(1);
 
 struct event_header {
     quint32 id;
     quint64 timestamp;
-} pa(8);
+} __attribute__((packed));
 
 struct packet_context {
     quint64 timestamp_begin;
@@ -21,7 +21,7 @@ struct packet_context {
     quint64 content_size;
     quint64 packet_size;
     quint64 events_discarded;
-} pa(8);
+} pa(1);
 
 struct events {
     union {
@@ -31,7 +31,7 @@ struct events {
         struct {
             int bar_val;
         } bar;
-    } fields pa(8);
+    } fields __attribute__((packed));
 };
 
 struct events_dfs {
@@ -41,13 +41,13 @@ struct events_dfs {
 };
 
 ulong parse_foo(struct events *ev) {
-    printf("foo_val: %d\n", ev->fields.foo.foo_val);
-    return sizeof(ev->fields.foo) + 4;
+    printf("foo_val: %x\n", ev->fields.foo.foo_val);
+    return sizeof(ev->fields.foo);
 }
 
 ulong parse_bar(struct events *ev) {
-    printf("bar_val: %d\n", ev->fields.bar.bar_val);
-    return sizeof(ev->fields.bar) + 4;
+    printf("bar_val: %x\n", ev->fields.bar.bar_val);
+    return sizeof(ev->fields.bar);
 }
 
 static struct events_dfs evs[] = {
@@ -89,8 +89,11 @@ int main(int argc, char *argv[])
         printf("events_discarded: %llu\n", pkt_ctx->events_discarded);
 
         buf += sizeof(struct packet_context);
+        uchar *pos1 = buf;
         uchar *end = buf + (pkt_ctx->content_size / 8);
-        while (buf < end) {
+        const int expected_events = 20;
+        int nr_read = 0;
+        while (buf < end && nr_read < expected_events) {
             struct event_header *hdr = (struct event_header *)buf;
             printf("event.id: %d\n", hdr->id);
             printf("event.ts: %llu\n", hdr->timestamp);
@@ -106,10 +109,14 @@ int main(int argc, char *argv[])
 
             struct events *ev = (struct events *)buf;
             ulong ev_size = evs[hdr->id].parse(ev);
-            ev_size = std::max((long)ev_size, (long)8);
+
             printf("ev_size: %ld\n", ev_size);
             buf += ev_size;
+            nr_read++;
+
         }
+        printf("content read: %d\n", buf - pos1);
+        printf("content diff: %d\n", (pkt_ctx->content_size / 8) - (buf - pos1));
 
     }
 
