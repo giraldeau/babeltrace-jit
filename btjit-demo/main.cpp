@@ -62,9 +62,10 @@ int main(int argc, char *argv[])
 
     QFile trace(TOPSRCDIR "/trace/my_stream_class_0");
     if (trace.open(QIODevice::ReadOnly)) {
-        uchar *buf = trace.map(0, trace.size());
+        uchar *pos = trace.map(0, trace.size());
+        const uchar *buf = pos;
 
-        struct packet_header *pkt_hdr = (struct packet_header *)buf;
+        struct packet_header *pkt_hdr = (struct packet_header *)pos;
         printf("magic: %x\n", pkt_hdr->magic);
 
         printf("uuid: ");
@@ -78,9 +79,9 @@ int main(int argc, char *argv[])
 
         printf("stream_id: %d\n", pkt_hdr->stream_id);
 
-        buf += sizeof(struct packet_header);
+        pos += sizeof(struct packet_header);
 
-        struct packet_context *pkt_ctx = (struct packet_context *)buf;
+        struct packet_context *pkt_ctx = (struct packet_context *)pos;
 
         printf("timestamp_begin: 0x%llx\n", pkt_ctx->timestamp_begin);
         printf("timestamp_end: 0x%llx\n", pkt_ctx->timestamp_end);
@@ -88,13 +89,12 @@ int main(int argc, char *argv[])
         printf("packet_size: %llu\n", pkt_ctx->packet_size / 8);
         printf("events_discarded: %llu\n", pkt_ctx->events_discarded);
 
-        buf += sizeof(struct packet_context);
-        uchar *pos1 = buf;
-        uchar *end = buf + (pkt_ctx->content_size / 8);
-        const int expected_events = 20;
+        pos += sizeof(struct packet_context);
+        const uchar *end = buf + (pkt_ctx->content_size / 8);
+        //const int expected_events = 20;
         int nr_read = 0;
-        while (buf < end && nr_read < expected_events) {
-            struct event_header *hdr = (struct event_header *)buf;
+        while (pos < end) {
+            struct event_header *hdr = (struct event_header *)pos;
             printf("event.id: %d\n", hdr->id);
             printf("event.ts: %llu\n", hdr->timestamp);
 
@@ -105,18 +105,19 @@ int main(int argc, char *argv[])
 
             printf("event.name: %s\n", evs[hdr->id].name);
 
-            buf += sizeof(struct event_header);
+            pos += sizeof(struct event_header);
 
-            struct events *ev = (struct events *)buf;
+            struct events *ev = (struct events *)pos;
             ulong ev_size = evs[hdr->id].parse(ev);
 
             printf("ev_size: %ld\n", ev_size);
-            buf += ev_size;
+            pos += ev_size;
             nr_read++;
 
         }
-        printf("content read: %d\n", buf - pos1);
-        printf("content diff: %d\n", (pkt_ctx->content_size / 8) - (buf - pos1));
+        printf("nr_events: %d\n", nr_read);
+        printf("content read: %d\n", pos - buf);
+        printf("content diff: %d\n", (pkt_ctx->content_size / 8) - (pos - buf));
 
     }
 
